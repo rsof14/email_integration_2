@@ -4,3 +4,7 @@ uvicorn==0.34.0
 pydantic-settings==2.7.1
 orjson==3.10.15
 pydantic==2.10.5
+SQLAlchemy==2.0.37
+SQLAlchemy-Utils==0.41.2
+alembic==1.14.1
+psycopg2-binary==2.9.5

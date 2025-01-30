@@ -8,7 +8,6 @@ app = FastAPI(
     title=app_config.app_name
 )
 
-
 app.include_router(login.router, prefix='/api/login', tags=['login'])
 
 
