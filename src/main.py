@@ -2,14 +2,18 @@ from fastapi import FastAPI
 import uvicorn
 from core.config import app_config
 from api import login, emails
+from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI(
     title=app_config.app_name
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.include_router(login.router, prefix='/api/login', tags=['login'])
-app.include_router(emails.router, prefix='/api/emails', tags=['emails'])
+app.include_router(emails.router, prefix='/api', tags=['emails'])
+
 
 
 if __name__ == '__main__':

@@ -1,18 +1,27 @@
 from http import HTTPStatus
-from fastapi import APIRouter, Depends, Response, HTTPException
-from fastapi.responses import JSONResponse
-from .models.login import LoginRequest, Token
+from fastapi import APIRouter, Depends, Request
+from jose import JWTError
 from services.passwords import decode_jwt, IncorrectAccessToken
 from sqlalchemy.orm import Session
 from db.pg_db import get_db
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.templating import Jinja2Templates
 
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login", auto_error=False)
+templates = Jinja2Templates(directory="templates")
 
 
 @router.get('/')
-async def get_emails(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    payload = decode_jwt(token)
-    return {"email": payload.get("email")}
+async def get_emails(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = decode_jwt(token)
+    except Exception:
+        return templates.TemplateResponse(
+            request=request, name="login.html"
+        )
+
+    return templates.TemplateResponse(
+                request=request, name="main.html", context={"email": payload.get("email")}
+            )
