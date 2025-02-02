@@ -3,7 +3,6 @@ from sqlalchemy_utils import EmailType
 import uuid
 from .pg_db import Base
 
-# Base  = declarative_base()
 
 class User(Base):
     __tablename__ = 'user'

@@ -27,6 +27,9 @@ class AppConfig(BaseSettings):
     port: int
     SQLALCHEMY_DATABASE_URL: str = \
         f'postgresql://{pg_config.db_user}:{pg_config.db_password}@{pg_config.db_host}:{pg_config.db_port}/{pg_config.db_name}'
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str
 
 
 app_config = AppConfig()
