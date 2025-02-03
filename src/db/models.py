@@ -8,5 +8,4 @@ class User(Base):
     __tablename__ = 'user'
     user_id  = Column(UUID, primary_key=True, default=uuid.uuid4())
     email = Column(EmailType, unique=True)
-    password = Column(String(100))
 

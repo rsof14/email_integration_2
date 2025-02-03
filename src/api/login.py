@@ -4,13 +4,14 @@ from .models.login import LoginRequest, Token
 from services.login_service import login_user, UserIncorrectLoginData
 from sqlalchemy.orm import Session
 from db.pg_db import get_db
+from typing import Annotated
 
 
 router = APIRouter()
 
 
 @router.post('/', response_model=Token)
-async def login(data: LoginRequest, db: Session = Depends(get_db)):
+async def login(data: LoginRequest, db: Annotated[Session, Depends(get_db)]):
     try:
         tokens = await login_user(data, db)
     except UserIncorrectLoginData as err:

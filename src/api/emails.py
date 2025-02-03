@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from db.pg_db import get_db
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
+from typing import Annotated
 
 
 router = APIRouter()
@@ -14,7 +15,7 @@ templates = Jinja2Templates(directory="templates")
 
 
 @router.get('/')
-async def get_emails(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def get_emails(request: Request, token: Annotated[str, Depends(oauth2_scheme)], db: Annotated[Session, Depends(get_db)]):
     try:
         payload = decode_jwt(token)
     except Exception:
