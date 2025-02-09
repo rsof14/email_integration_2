@@ -11,9 +11,8 @@ app = FastAPI(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-app.include_router(login.router, prefix='/api/login', tags=['login'])
-app.include_router(emails.router, prefix='/api/email', tags=['email'])
-
+app.include_router(login.router, prefix='/login', tags=['login'])
+app.include_router(emails.router, prefix='/email', tags=['email'])
 
 
 if __name__ == '__main__':
