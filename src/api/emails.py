@@ -1,10 +1,7 @@
-from fastapi import APIRouter, Depends, Request, Cookie
-from services.login_service import get_user_data_from_session
-from sqlalchemy.orm import Session
-from db.pg_db import get_db
+from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
-from typing import Annotated
 from fastapi.responses import RedirectResponse
+from starsessions import load_session
 
 
 router = APIRouter()
@@ -12,10 +9,11 @@ templates = Jinja2Templates(directory="templates")
 
 
 @router.get('/')
-async def get_emails(request: Request, db: Annotated[Session, Depends(get_db)], session_id: str = Cookie(None)):
-    user_data = await get_user_data_from_session(session_id)
-    if not user_data:
+async def get_emails(request: Request):
+    await load_session(request)
+    user_email = request.session.get('email', None)
+    if not user_email:
         return RedirectResponse("/login", status_code=302)
     return templates.TemplateResponse(
-                request=request, name="main.html", context={"email": user_data['email']}
+                request=request, name="main.html", context={"email": user_email}
             )
