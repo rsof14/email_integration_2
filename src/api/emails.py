@@ -10,7 +10,6 @@ templates = Jinja2Templates(directory="templates")
 
 @router.get('/')
 async def get_emails(request: Request):
-    await load_session(request)
     user_email = request.session.get('email', None)
     if not user_email:
         return RedirectResponse("/login", status_code=302)

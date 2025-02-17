@@ -22,7 +22,6 @@ def login(request: Request):
 @router.post('/')
 async def login(request: Request, data: Annotated[LoginRequest, Form()], db: Annotated[Session, Depends(get_db)]):
     try:
-        await load_session(request)
         user_data = await login_user(data, db)
         request.session['email'] = user_data['email']
         request.session['password'] = user_data['password']
