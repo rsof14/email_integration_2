@@ -1,10 +1,12 @@
-from datetime import datetime
-
+from datetime import datetime, timedelta
 import orjson
 from imapclient import IMAPClient
 from urllib.request import urlopen
 from imapclient.exceptions import LoginError
 from aioimaplib import aioimaplib
+from email.header import decode_header
+from email.utils import parsedate_tz, mktime_tz
+from email import message_from_bytes
 
 
 class GettingIMAPServerError(Exception):
@@ -34,6 +36,14 @@ def check_password(email: str, password: str):
     return True
 
 
+def decode_mime_words(s):
+    decoded_fragments = decode_header(s)
+    return ''.join(
+        fragment.decode(encoding or 'utf-8') if isinstance(fragment, bytes) else fragment
+        for fragment, encoding in decoded_fragments
+    )
+
+
 async def check_mailbox(email: str, password: str, since_date: str = None):
     print('started checking mailbox')
     server = get_imap_server(email)
@@ -45,13 +55,14 @@ async def check_mailbox(email: str, password: str, since_date: str = None):
     if status != "OK":
         return None
     if since_date:
-        since_date_obj = datetime.strptime(since_date, '%Y-%m-%d')
-        since_date_imap = since_date_obj.strftime('%d-%b-%Y')
+        since_date_imap = datetime.strptime(since_date, '%Y-%m-%d').strftime('%d-%b-%Y')
         criteria = f'(SINCE {since_date_imap})'
     else:
         # criteria = 'ALL'
-        criteria = "('SINCE' 20-02-2025)"
-    status, messages = await imap_client.search('SINCE 20-Feb-2025')
+        since_date_imap = (datetime.now() - timedelta(days=2)).strftime('%d-%b-%Y')
+        criteria = f'(SINCE {since_date_imap})'
+        print(criteria)
+    status, messages = await imap_client.search(criteria)
     print(f'status {status} messages {messages}')
     if status != "OK" or not messages[0]:
         print('no messages')
@@ -63,6 +74,17 @@ async def check_mailbox(email: str, password: str, since_date: str = None):
             print(f'не удалось получить письмо с id {email_id}')
             continue
 
-        print(msg_data)
+        msg = message_from_bytes(msg_data[1])
+        email_date = datetime(*parsedate_tz(msg["Date"])[:6])
+        print(f'email date {email_date} with type {type(email_date)}')
+        since_date = '2025-02-22 17:00:00'
+        if since_date and email_date <= datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S'):
+            print('!!!')
+            continue
+        msg_from = msg["Return-path"]
+        header = decode_header(msg["Subject"])[0][0].decode() if msg["Subject"] else ''
+
+        print(f'header {header} date {email_date} from {msg_from}')
+
 
     await imap_client.logout()
