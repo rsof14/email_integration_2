@@ -21,5 +21,12 @@ class Message(Base):
     message_text = Column(String)
     receive_date = Column(DateTime, default=datetime.now())
 
+    def __init__(self, email: str, date: str, topic: str, from_email: str, message_text: str):
+        self.email = email
+        self.date = date
+        self.topic = topic
+        self.from_email = from_email
+        self.message_text = message_text
+
 
 

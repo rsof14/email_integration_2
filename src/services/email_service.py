@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timedelta
 import orjson
 from imapclient import IMAPClient
@@ -7,6 +8,8 @@ from aioimaplib import aioimaplib
 from email.header import decode_header
 from email.utils import parsedate_tz, mktime_tz
 from email import message_from_bytes
+from db.queries.emails import write_messages
+from core.config import app_config
 
 
 class GettingIMAPServerError(Exception):
@@ -44,8 +47,9 @@ def decode_mime_words(s):
     )
 
 
-async def check_mailbox(email: str, password: str, since_date: str = None):
+async def check_mailbox(email: str, password: str, since_date: str = None, db = None):
     print('started checking mailbox')
+    messages_list = []
     server = get_imap_server(email)
     imap_client = aioimaplib.IMAP4_SSL(host=server)
     await imap_client.wait_hello_from_server()
@@ -54,13 +58,14 @@ async def check_mailbox(email: str, password: str, since_date: str = None):
     status, data = await imap_client.select('INBOX')
     if status != "OK":
         return None
+    since_date = '2025-02-20 17:00:00'
     if since_date:
-        since_date_imap = datetime.strptime(since_date, '%Y-%m-%d').strftime('%d-%b-%Y')
+        since_date_imap = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S').strftime('%d-%b-%Y')
         criteria = f'(SINCE {since_date_imap})'
     else:
-        # criteria = 'ALL'
-        since_date_imap = (datetime.now() - timedelta(days=2)).strftime('%d-%b-%Y')
-        criteria = f'(SINCE {since_date_imap})'
+        criteria = 'ALL'
+        # since_date_imap = (datetime.now() - timedelta(days=2)).strftime('%d-%b-%Y')
+        # criteria = f'(SINCE {since_date_imap})'
         print(criteria)
     status, messages = await imap_client.search(criteria)
     print(f'status {status} messages {messages}')
@@ -77,14 +82,20 @@ async def check_mailbox(email: str, password: str, since_date: str = None):
         msg = message_from_bytes(msg_data[1])
         email_date = datetime(*parsedate_tz(msg["Date"])[:6])
         print(f'email date {email_date} with type {type(email_date)}')
-        since_date = '2025-02-22 17:00:00'
         if since_date and email_date <= datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S'):
             print('!!!')
             continue
         msg_from = msg["Return-path"]
         header = decode_header(msg["Subject"])[0][0].decode() if msg["Subject"] else ''
-
-        print(f'header {header} date {email_date} from {msg_from}')
-
+        message_text = ''
+        for part in msg.walk():
+            if part.get_content_maintype() == 'text' and part.get_content_subtype() == 'plain':
+                message_text = base64.b64decode(part.get_payload()).decode()
+        messages_list.append({'date': email_date, 'from_email': msg_from, 'topic': header, 'message_text': message_text})
+        if len(messages_list) >= app_config.MESSAGES_BATCH_SIZE:
+            write_messages(db, email, messages_list)
+            messages_list = []
+    write_messages(db, email, messages_list)
+    print(messages_list)
 
     await imap_client.logout()
