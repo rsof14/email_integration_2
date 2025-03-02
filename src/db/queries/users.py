@@ -10,6 +10,7 @@ def create_user(db: Session, email: str):
     user = get_user_by_email(db, email)
     if not user:
         new_user = User(email=email)
+        print(f'user id {new_user.user_id}')
         db.add(new_user)
         db.commit()
         db.refresh(new_user)

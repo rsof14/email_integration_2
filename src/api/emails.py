@@ -1,9 +1,13 @@
 import asyncio
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from fastapi.websockets import WebSocket, WebSocketDisconnect
-from typing import Dict
+from typing import Dict, Annotated
+from services.email_service import check_mailbox, get_user_emails
+from sqlalchemy.orm import Session
+from db.pg_db import get_db
+from .models.messages import Page, Message
 
 
 router = APIRouter()
@@ -24,11 +28,24 @@ async def websocket_endpoint(websocket: WebSocket):
         active_connections.pop(user_email, None)
 
 
+@router.post('/update')
+def update_emails(request: Request, db: Annotated[Session, Depends(get_db)]):
+    user_email = request.session.get('email', None)
+    user_password = request.session.get('password', None)
+    if user_email and user_password:
+        asyncio.create_task(check_mailbox(user_email, user_password, db))
+    else:
+        return RedirectResponse("/login", status_code=302)
+
+
 @router.get('/')
-async def get_emails(request: Request):
+async def get_emails(request: Request, db: Annotated[Session, Depends(get_db)], page: Page = Depends()):
     user_email = request.session.get('email', None)
     if not user_email:
         return RedirectResponse("/login", status_code=302)
+    print(f'page {page} {page.page_from} {page.page_size}')
+    emails = get_user_emails(db=db, email=user_email, page=page)
+    print(f'emails {emails}')
     return templates.TemplateResponse(
-                request=request, name="main.html", context={"email": user_email}
+                request=request, name="main.html", context={"emails": emails}
             )

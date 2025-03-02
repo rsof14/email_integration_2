@@ -10,10 +10,6 @@ class UserIncorrectLoginData(Exception):
 
 async def login_user(data: LoginRequest, db):
     if check_password(data.email, data.password):
-        last_message = get_last_message(db, data.email)
-        since_date = last_message.date if last_message else None
-        print(f'since date {since_date}')
-        await check_mailbox(data.email, data.password, since_date, db)
         create_user(db, data.email)
         return {'email': data.email, 'password': data.password}
     else:

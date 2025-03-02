@@ -8,8 +8,9 @@ from aioimaplib import aioimaplib
 from email.header import decode_header
 from email.utils import parsedate_tz, mktime_tz
 from email import message_from_bytes
-from db.queries.emails import write_messages
+from db.queries.emails import write_messages, get_last_message, get_user_emails_page
 from core.config import app_config
+from src.api.models.messages import Page
 
 
 class GettingIMAPServerError(Exception):
@@ -47,30 +48,25 @@ def decode_mime_words(s):
     )
 
 
-async def check_mailbox(email: str, password: str, since_date: str = None, db = None):
-    print('started checking mailbox')
+async def check_mailbox(email: str, password: str, db):
     messages_list = []
     server = get_imap_server(email)
     imap_client = aioimaplib.IMAP4_SSL(host=server)
     await imap_client.wait_hello_from_server()
     await imap_client.login(email, password)
 
+    last_message = get_last_message(db, email)
+    since_date = last_message.date if last_message else None
     status, data = await imap_client.select('INBOX')
     if status != "OK":
         return None
-    since_date = '2025-02-20 17:00:00'
     if since_date:
-        since_date_imap = datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S').strftime('%d-%b-%Y')
+        since_date_imap = since_date.strftime('%d-%b-%Y')
         criteria = f'(SINCE {since_date_imap})'
     else:
         criteria = 'ALL'
-        # since_date_imap = (datetime.now() - timedelta(days=2)).strftime('%d-%b-%Y')
-        # criteria = f'(SINCE {since_date_imap})'
-        print(criteria)
     status, messages = await imap_client.search(criteria)
-    print(f'status {status} messages {messages}')
     if status != "OK" or not messages[0]:
-        print('no messages')
         return None
     emails_ids = messages[0].decode().split()
     for email_id in emails_ids:
@@ -81,12 +77,14 @@ async def check_mailbox(email: str, password: str, since_date: str = None, db = 
 
         msg = message_from_bytes(msg_data[1])
         email_date = datetime(*parsedate_tz(msg["Date"])[:6])
-        print(f'email date {email_date} with type {type(email_date)}')
-        if since_date and email_date <= datetime.strptime(since_date, '%Y-%m-%d %H:%M:%S'):
-            print('!!!')
+        if since_date and email_date <= since_date:
             continue
         msg_from = msg["Return-path"]
-        header = decode_header(msg["Subject"])[0][0].decode() if msg["Subject"] else ''
+        header_row = decode_header(msg["Subject"])[0][0] if msg["Subject"] else ''
+        try:
+            header = header_row.decode()
+        except AttributeError:
+            header = header_row
         message_text = ''
         for part in msg.walk():
             if part.get_content_maintype() == 'text' and part.get_content_subtype() == 'plain':
@@ -96,6 +94,10 @@ async def check_mailbox(email: str, password: str, since_date: str = None, db = 
             write_messages(db, email, messages_list)
             messages_list = []
     write_messages(db, email, messages_list)
-    print(messages_list)
 
     await imap_client.logout()
+
+
+def get_user_emails(email: str, page: Page, db):
+    emails = get_user_emails_page(db, email, page.page_from, page.page_size)
+    return emails

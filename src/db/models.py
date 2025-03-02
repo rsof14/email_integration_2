@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, UUID, DateTime
+from sqlalchemy import Column, String, UUID, DateTime, Uuid
 from sqlalchemy_utils import EmailType
 import uuid
 from .pg_db import Base
@@ -7,13 +7,16 @@ from datetime import datetime
 
 class User(Base):
     __tablename__ = 'user'
-    user_id  = Column(UUID, primary_key=True, default=uuid.uuid4())
+    user_id  = Column(UUID, primary_key=True, default=uuid.uuid4)
     email = Column(EmailType, unique=True)
+
+    def __init__(self, email: str):
+        self.email = email
 
 
 class Message(Base):
     __tablename__ = 'message'
-    message_id = Column(UUID, primary_key=True, default=uuid.uuid4())
+    message_id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     email = Column(EmailType)
     date = Column(DateTime)
     topic = Column(String)
