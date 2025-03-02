@@ -16,5 +16,9 @@ def write_messages(db: Session, email: str, messages: list[dict]):
 
 
 def get_user_emails_page(db: Session, email: str, page_from: int, page_size: int):
-    return db.query(Message).filter_by(email=email).order_by(desc(Message.date)).limit(page_from + page_size).offset(
+    return db.query(Message).filter_by(email=email).order_by(desc(Message.date)).limit(page_size).offset(
         page_from).all()
+
+
+def get_all_emails(db: Session, email: str):
+    return db.query(Message).filter_by(email=email).all()

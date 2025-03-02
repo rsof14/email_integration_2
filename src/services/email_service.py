@@ -8,9 +8,10 @@ from aioimaplib import aioimaplib
 from email.header import decode_header
 from email.utils import parsedate_tz, mktime_tz
 from email import message_from_bytes
-from db.queries.emails import write_messages, get_last_message, get_user_emails_page
+from db.queries.emails import write_messages, get_last_message, get_user_emails_page, get_all_emails
 from core.config import app_config
 from src.api.models.messages import Page
+import math
 
 
 class GettingIMAPServerError(Exception):
@@ -99,5 +100,10 @@ async def check_mailbox(email: str, password: str, db):
 
 
 def get_user_emails(email: str, page: Page, db):
-    emails = get_user_emails_page(db, email, page.page_from, page.page_size)
+    emails = get_user_emails_page(db=db, email=email, page_from=page.page_from, page_size=page.page_size)
     return emails
+
+
+def get_pages_num(email: str, page: Page, db):
+    emails = get_all_emails(db=db, email=email)
+    return math.ceil(len(emails) / page.page_size)
