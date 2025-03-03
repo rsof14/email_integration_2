@@ -1,4 +1,5 @@
 import base64
+import json
 from datetime import datetime, timedelta
 import orjson
 from imapclient import IMAPClient
@@ -12,6 +13,8 @@ from db.queries.emails import write_messages, get_last_message, get_user_emails_
 from core.config import app_config
 from src.api.models.messages import Page
 import math
+from fastapi.websockets import WebSocket
+from sqlalchemy.orm import sessionmaker
 
 
 class GettingIMAPServerError(Exception):
@@ -49,7 +52,7 @@ def decode_mime_words(s):
     )
 
 
-async def check_mailbox(email: str, password: str, db):
+async def check_mailbox(email: str, password: str, db: sessionmaker, ws_connection: WebSocket):
     messages_list = []
     server = get_imap_server(email)
     imap_client = aioimaplib.IMAP4_SSL(host=server)
@@ -62,7 +65,7 @@ async def check_mailbox(email: str, password: str, db):
     if status != "OK":
         return None
     if since_date:
-        since_date_imap = since_date.strftime('%d-%b-%Y')
+        since_date_imap = datetime.strptime(since_date, "%Y-%m-%dT%H:%M:%S").strftime('%d-%b-%Y')
         criteria = f'(SINCE {since_date_imap})'
     else:
         criteria = 'ALL'
@@ -78,7 +81,7 @@ async def check_mailbox(email: str, password: str, db):
 
         msg = message_from_bytes(msg_data[1])
         email_date = datetime(*parsedate_tz(msg["Date"])[:6])
-        if since_date and email_date <= since_date:
+        if since_date and email_date <= datetime.strptime(since_date, "%Y-%m-%dT%H:%M:%S"):
             continue
         msg_from = msg["Return-path"]
         header_row = decode_header(msg["Subject"])[0][0] if msg["Subject"] else ''
@@ -93,8 +96,14 @@ async def check_mailbox(email: str, password: str, db):
         messages_list.append({'date': email_date, 'from_email': msg_from, 'topic': header, 'message_text': message_text})
         if len(messages_list) >= app_config.MESSAGES_BATCH_SIZE:
             write_messages(db, email, messages_list)
+            emails = get_user_emails_page(db=db, email=email, page_from=1, page_size=app_config.DEFAULT_PAGE_SIZE)
+            json_data = json.dumps(list(map(lambda message: message.to_dict(), emails)))
+            await ws_connection.send_text(json_data)
             messages_list = []
     write_messages(db, email, messages_list)
+    emails = get_user_emails_page(db=db, email=email, page_from=1, page_size=app_config.DEFAULT_PAGE_SIZE)
+    json_data = json.dumps(list(map(lambda message: message.to_dict(), emails)))
+    await ws_connection.send_text(json_data)
 
     await imap_client.logout()
 

@@ -1,7 +1,6 @@
 from api.models.login import LoginRequest
 from db.queries.users import create_user
-from db.queries.emails import get_last_message
-from .email_service import check_password, check_mailbox
+from .email_service import check_password
 
 
 class UserIncorrectLoginData(Exception):

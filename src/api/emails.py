@@ -7,7 +7,10 @@ from typing import Dict, Annotated
 from services.email_service import check_mailbox, get_user_emails, get_pages_num
 from sqlalchemy.orm import Session
 from db.pg_db import get_db
-from .models.messages import Page, Message
+from .models.messages import Page
+from http import HTTPStatus
+from starlette.background import BackgroundTask
+from starlette.responses import JSONResponse
 
 
 router = APIRouter()
@@ -29,11 +32,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 @router.post('/update')
-async def update_emails(request: Request, db: Annotated[Session, Depends(get_db)]):
+def update_emails(request: Request, db: Annotated[Session, Depends(get_db)]):
     user_email = request.session.get('email', None)
     user_password = request.session.get('password', None)
     if user_email and user_password:
-        asyncio.create_task(check_mailbox(user_email, user_password, db))
+        task = BackgroundTask(check_mailbox, user_email, user_password, db, active_connections.get(user_email))
+        return JSONResponse({"message": "Updating emails"}, status_code=HTTPStatus.ACCEPTED, background=task)
     else:
         return RedirectResponse("/login", status_code=302)
 

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, UUID, DateTime, Uuid
+from sqlalchemy.orm import reconstructor
 from sqlalchemy_utils import EmailType
 import uuid
 from .pg_db import Base
@@ -30,6 +31,19 @@ class Message(Base):
         self.topic = topic
         self.from_email = from_email
         self.message_text = message_text
+
+    @reconstructor
+    def on_load(self):
+        self.date = self.date.isoformat() if isinstance(self.date, datetime) else self.date
+
+    def to_dict(self):
+        return {
+            "email": self.email,
+            "date": self.date,
+            "topic": self.topic,
+            "from_email": self.from_email,
+            "message_text": self.message_text
+        }
 
 
 
