@@ -116,9 +116,13 @@
     <script>
         var ws = new WebSocket("ws://" + document.domain + ':' + location.port + "/email/ws");
         ws.onmessage = function(event) {
-            const receivedList = JSON.parse(event.data);
-            console.log("Received list from server:", receivedList);
-            updateTable(receivedList);
+            try {
+                const receivedList = JSON.parse(event.data);
+                console.log("Received list from server:", receivedList);
+                updateTable(receivedList);
+            } catch(e) {
+                alert(event.data);
+            }
         };
 
         document.getElementById('refresh').addEventListener('click', function(event) {

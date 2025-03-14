@@ -1,10 +1,8 @@
 import base64
 import json
 from datetime import datetime, timedelta
-import orjson
 from imapclient import IMAPClient
-from urllib.request import urlopen
-from imapclient.exceptions import LoginError
+from imapclient.exceptions import LoginError, IMAPClientError
 from aioimaplib import aioimaplib
 from email.header import decode_header
 from email.utils import parsedate_tz, mktime_tz
@@ -15,23 +13,53 @@ from src.api.models.messages import Page
 import math
 from fastapi.websockets import WebSocket
 from sqlalchemy.orm import sessionmaker
+from utils.email_utils import get_imap_server, decode_mime_words, parse_message
 
 
-class GettingIMAPServerError(Exception):
-    ...
+class EmailFetcher:
+    def __init__(self, email: str, password: str):
+        self.email = email
+        self.password = password
 
+    def __setattr__(self, key, value):
+        if key == 'email':
+            self.server = get_imap_server(self.email)
 
-def get_imap_server(email: str):
-    with urlopen('https://emailsettings.firetrust.com/settings?q=' + email) as response:
-        if response.getcode() == 200:
-            source = response.read()
-            data = orjson.loads(source)
-            for i in range(0, len(data["settings"]) + 1):
-                if data["settings"][i]["protocol"] == "IMAP":
-                    imap_server = data["settings"][i]["address"]
-                    return imap_server
+    async def __aenter__(self):
+        self.client = aioimaplib.IMAP4_SSL(host=self.server)
+        await self.client.login(self.email, self.password)
 
-    raise GettingIMAPServerError()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.close()
+        await self.client.logout()
+
+    async def __aiter__(self):
+        self.messages = []
+        last_message = get_last_message(db, self.email)
+        since_date = last_message.date if last_message else None
+        status, data = await self.client.select('INBOX')
+        if since_date:
+            since_date_imap = datetime.strptime(since_date, "%Y-%m-%dT%H:%M:%S").strftime('%d-%b-%Y')
+            criteria = f'(SINCE {since_date_imap})'
+        else:
+            criteria = 'ALL'
+        status, messages = await self.client.search(criteria)
+        emails_ids = messages[0].decode().split() if messages[0] else []
+        for email_id in emails_ids:
+            status, msg_data = await self.client.fetch(email_id, 'RFC822')
+            if status != "OK":
+                continue
+            message = parse_message(msg_data)
+            self.messages.append(message)
+
+        return self
+
+    async def __anext__(self):
+        if self.messages:
+            return self.messages.pop()
+        else:
+            raise StopIteration('All messages have been fetched')
+
 
 
 def check_password(email: str, password: str):
@@ -44,26 +72,23 @@ def check_password(email: str, password: str):
     return True
 
 
-def decode_mime_words(s):
-    decoded_fragments = decode_header(s)
-    return ''.join(
-        fragment.decode(encoding or 'utf-8') if isinstance(fragment, bytes) else fragment
-        for fragment, encoding in decoded_fragments
-    )
-
 
 async def check_mailbox(email: str, password: str, db: sessionmaker, ws_connection: WebSocket):
     messages_list = []
     server = get_imap_server(email)
     imap_client = aioimaplib.IMAP4_SSL(host=server)
-    await imap_client.wait_hello_from_server()
-    await imap_client.login(email, password)
+    try:
+        await imap_client.wait_hello_from_server()
+        await imap_client.login(email, password)
+    except IMAPClientError:
+        await ws_connection.send_text('An error occurred while connecting to the mails server.')
 
     last_message = get_last_message(db, email)
     since_date = last_message.date if last_message else None
     status, data = await imap_client.select('INBOX')
     if status != "OK":
-        return None
+        await ws_connection.send_text('Failed to receive emails.')
+        return
     if since_date:
         since_date_imap = datetime.strptime(since_date, "%Y-%m-%dT%H:%M:%S").strftime('%d-%b-%Y')
         criteria = f'(SINCE {since_date_imap})'
@@ -71,12 +96,11 @@ async def check_mailbox(email: str, password: str, db: sessionmaker, ws_connecti
         criteria = 'ALL'
     status, messages = await imap_client.search(criteria)
     if status != "OK" or not messages[0]:
-        return None
+        return
     emails_ids = messages[0].decode().split()
     for email_id in emails_ids:
         status, msg_data = await imap_client.fetch(email_id, 'RFC822')
         if status != "OK":
-            print(f'не удалось получить письмо с id {email_id}')
             continue
 
         msg = message_from_bytes(msg_data[1])

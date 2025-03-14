@@ -25,7 +25,6 @@ async def websocket_endpoint(websocket: WebSocket):
     active_connections[user_email] = websocket
     try:
         while True:
-            await websocket.send_json({'msg': f'Connected {user_email}'})
             await asyncio.sleep(5)
     except WebSocketDisconnect:
         active_connections.pop(user_email, None)
@@ -39,7 +38,7 @@ def update_emails(request: Request, db: Annotated[Session, Depends(get_db)]):
         task = BackgroundTask(check_mailbox, user_email, user_password, db, active_connections.get(user_email))
         return JSONResponse({"message": "Updating emails"}, status_code=HTTPStatus.ACCEPTED, background=task)
     else:
-        return RedirectResponse("/login", status_code=302)
+        return JSONResponse(content={"message": "Auth required"}, status_code=HTTPStatus.UNAUTHORIZED)
 
 
 @router.get('/')
