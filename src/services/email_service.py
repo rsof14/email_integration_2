@@ -13,13 +13,14 @@ from src.api.models.messages import Page
 import math
 from fastapi.websockets import WebSocket
 from sqlalchemy.orm import sessionmaker
-from utils.email_utils import get_imap_server, decode_mime_words, parse_message
+from utils.email_utils import get_imap_server, parse_message
 
 
 class EmailFetcher:
-    def __init__(self, email: str, password: str):
+    def __init__(self, email: str, password: str, since_date: str|None = None):
         self.email = email
         self.password = password
+        self.since_date = since_date
 
     def __setattr__(self, key, value):
         if key == 'email':
@@ -35,11 +36,9 @@ class EmailFetcher:
 
     async def __aiter__(self):
         self.messages = []
-        last_message = get_last_message(db, self.email)
-        since_date = last_message.date if last_message else None
         status, data = await self.client.select('INBOX')
-        if since_date:
-            since_date_imap = datetime.strptime(since_date, "%Y-%m-%dT%H:%M:%S").strftime('%d-%b-%Y')
+        if self.since_date:
+            since_date_imap = datetime.strptime(self.since_date, "%Y-%m-%dT%H:%M:%S").strftime('%d-%b-%Y')
             criteria = f'(SINCE {since_date_imap})'
         else:
             criteria = 'ALL'
@@ -59,6 +58,48 @@ class EmailFetcher:
             return self.messages.pop()
         else:
             raise StopIteration('All messages have been fetched')
+
+class EmailObserver:
+    def __init__(self, update: callable, kwargs: dict):
+        self.update = update
+        self.kwargs = kwargs
+
+    def notify(self, email: dict):
+        self.update(email, **self.kwargs)
+
+class EmailCollection:
+    __observers: list[EmailObserver]
+    __fetcher: EmailFetcher
+
+    def __init__(self, fetcher: EmailFetcher):
+        self.__observers = []
+        self.__fetcher = fetcher
+
+    def subscribe(self, observer: EmailObserver):
+        self.__observers.append(observer)
+
+    async def list_emails(self):
+        async for email in self.__fetcher:
+            for observer in self.__observers:
+                observer.notify(email)
+
+
+def check_password(email: str, password: str):
+    with EmailFetcher(email=email, password=password):
+        return
+
+async def send_message_to_ws(email: str, ws_connection: WebSocket):
+    await ws_connection.send_text(email)
+
+async def check_mailbox(email: str, password: str, db: sessionmaker, ws_connection: WebSocket):
+    last_message = get_last_message(db, email)
+    since_date = last_message.date if last_message else None
+    with EmailFetcher(email=email, password=password, since_date=since_date) as fetcher:
+        observer = EmailObserver(update=send_message_to_ws, kwargs={'ws_connection': ws_connection})
+        email_collection = EmailCollection(fetcher=fetcher)
+        email_collection.subscribe(observer)
+        await email_collection.list_emails()
+
 
 
 
