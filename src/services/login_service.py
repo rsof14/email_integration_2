@@ -8,7 +8,7 @@ class UserIncorrectLoginData(Exception):
 
 
 async def login_user(data: LoginRequest, db):
-    if check_password(data.email, data.password):
+    if await check_password(data.email, data.password):
         create_user(db, data.email)
         return {'email': data.email, 'password': data.password}
     else:

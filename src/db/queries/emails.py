@@ -15,6 +15,13 @@ def write_messages(db: Session, email: str, messages: list[dict]):
     db.commit()
 
 
+def write_message(db: Session, email: str, message: dict):
+    msg = Message(email=email, date=message['date'], from_email=message['from_email'],
+                          topic=message['topic'], message_text=message['message_text'])
+    db.add(msg)
+    db.commit()
+
+
 def get_user_emails_page(db: Session, email: str, page_from: int, page_size: int):
     return db.query(Message).filter_by(email=email).order_by(desc(Message.date)).limit(page_size).offset(
         page_from).all()
