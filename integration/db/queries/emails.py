@@ -1,6 +1,6 @@
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
-from src.db.models import Message
+from ..models import Message
 
 
 def get_last_message(db: Session, email: str):

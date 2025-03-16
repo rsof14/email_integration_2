@@ -1,11 +1,15 @@
 import base64
+import ssl
+from datetime import datetime
 
 import orjson
 from urllib.request import urlopen
 from email.header import decode_header
 from email.utils import parsedate_tz, mktime_tz
 from email import message_from_bytes
-from datetime import datetime
+
+
+ssl._create_default_https_context = ssl._create_stdlib_context
 
 
 class GettingIMAPServerError(Exception):

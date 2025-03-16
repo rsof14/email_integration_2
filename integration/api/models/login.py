@@ -1,4 +1,4 @@
-from core.base_model import OrjsonBaseModel
+from ...core.base_model import OrjsonBaseModel
 
 
 class LoginRequest(OrjsonBaseModel):

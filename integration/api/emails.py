@@ -1,16 +1,16 @@
 import asyncio
+from typing import Dict, Annotated
 from fastapi import APIRouter, Request, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from fastapi.websockets import WebSocket, WebSocketDisconnect
-from typing import Dict, Annotated
-from services.email_service import check_mailbox, get_user_emails, get_pages_num
-from sqlalchemy.orm import Session
-from db.pg_db import get_db
-from .models.messages import Page
 from http import HTTPStatus
 from starlette.background import BackgroundTask
 from starlette.responses import JSONResponse
+from sqlalchemy.orm import Session
+from .models.messages import Page
+from ..db.pg_db import get_db
+from ..services.email_service import check_mailbox, get_user_emails, get_pages_num
 
 
 router = APIRouter()

@@ -1,6 +1,6 @@
-from core.config import app_config
 from fastapi import Query
-from core.base_model import OrjsonBaseModel
+from ...core.config import app_config
+from ...core.base_model import OrjsonBaseModel
 
 
 class Page:

@@ -1,5 +1,5 @@
 from redis.asyncio import Redis
-from core.config import redis_config
+from ..core.config import redis_config
 
 
 def get_redis():

@@ -1,32 +1,36 @@
-import base64
 import json
-from datetime import datetime, timedelta
-from imapclient import IMAPClient
-from imapclient.exceptions import LoginError, IMAPClientError
-from aioimaplib import aioimaplib
-from email.header import decode_header
-from email.utils import parsedate_tz, mktime_tz
-from email import message_from_bytes
-from db.queries.emails import write_messages, get_last_message, get_user_emails_page, get_all_emails, write_message
-from core.config import app_config
-from src.api.models.messages import Page
 import math
+from datetime import datetime
+
 from fastapi.websockets import WebSocket
-from sqlalchemy.orm import sessionmaker
-from utils.email_utils import get_imap_server, parse_message
+from sqlalchemy.orm import sessionmaker, Session
+from aioimaplib import aioimaplib
+from ..api.models.messages import Page
+from ..core.config import app_config
+from ..db.queries.emails import get_last_message, get_user_emails_page, get_all_emails, write_message
+from ..utils.email_utils import get_imap_server, parse_message
 
 
 class EmailFetcher:
+    email: str
+    password: str
+    since_date: str | None
+    server: str | None
+    client: aioimaplib.IMAP4_SSL | None
+
     def __init__(self, email: str, password: str, since_date: str|None = None):
         self.email = email
         self.password = password
         self.since_date = since_date
-        self.server = get_imap_server(email)
+        self.server = None
+        self.client = None
 
     async def __aenter__(self):
+        self.server = get_imap_server(self.email)
         self.client = aioimaplib.IMAP4_SSL(host=self.server)
         await self.client.wait_hello_from_server()
         await self.client.login(self.email, self.password)
+        return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         # await self.client.close()
@@ -54,17 +58,39 @@ class EmailFetcher:
     async def __anext__(self):
         if self.messages:
             return self.messages.pop()
-        else:
-            raise StopIteration('All messages have been fetched')
+        raise StopIteration('All messages have been fetched')
 
 
 class EmailObserver:
-    def __init__(self, update: callable, kwargs: dict):
+    def __init__(self, update: callable, **kwargs):
         self.update = update
         self.kwargs = kwargs
 
     def notify(self, email: str, message: dict):
         self.update(email, message, **self.kwargs)
+
+# class EmailObserver(Protocol):
+#     @abstractmethod
+#     def notify(self, email: str, message: dict):
+#         pass
+#
+#
+# class DatabaseEmailObserver(EmailObserver):
+#     def __init__(self):
+#         pass
+#
+#     @override
+#     def notify(self, email: str, message: dict):
+#         pass # обрабатываем письмо, сохраняя в БД
+#
+#
+# class WebsocketEmailObserver(EmailObserver):
+#     def __init__(self):
+#         pass
+#
+#     @override
+#     def notify(self, email: str, message: dict):
+#         pass # обрабатываем письмо, отправляя уведомление в вебсокет
 
 
 class EmailCollection:
@@ -85,8 +111,12 @@ class EmailCollection:
 
 
 async def check_password(email: str, password: str):
-    async with EmailFetcher(email=email, password=password):
-        return True
+    try:
+        async with EmailFetcher(email=email, password=password):
+            return True
+    except Exception as e:
+        # TODO: log e
+        return False
 
 
 async def send_message_to_ws(email: str, message_data: dict, ws_connection: WebSocket, db: sessionmaker):
@@ -96,14 +126,19 @@ async def send_message_to_ws(email: str, message_data: dict, ws_connection: WebS
     await ws_connection.send_text(json_data)
 
 
-async def check_mailbox(email: str, password: str, db: sessionmaker, ws_connection: WebSocket):
-    last_message = get_last_message(db, email)
-    since_date = last_message.date if last_message else None
-    async with EmailFetcher(email=email, password=password, since_date=since_date) as fetcher:
-        observer = EmailObserver(update=send_message_to_ws, kwargs={'ws_connection': ws_connection})
-        email_collection = EmailCollection(fetcher=fetcher)
-        email_collection.subscribe(observer)
-        await email_collection.list_emails()
+async def check_mailbox(email: str, password: str, db: Session, ws_connection: WebSocket):
+    try:
+        last_message = get_last_message(db, email)
+        since_date = last_message.date if last_message else None
+        async with EmailFetcher(email=email, password=password, since_date=since_date) as fetcher:
+            observer = EmailObserver(update=send_message_to_ws, ws_connection = ws_connection)
+            email_collection = EmailCollection(fetcher=fetcher)
+            email_collection.subscribe(observer)
+            await email_collection.list_emails()
+    except:
+        # 1. Если ошибка произошла НЕ с вебсокетом и вебсокет жив, то отправить ошибку в вебсокет
+        # 2. Если ошибка произошла с вебсокет соединением, залогировать ошибку
+        pass  # TODO: обработать исключительную ситуацию
 
 
 def get_user_emails(email: str, page: Page, db):
