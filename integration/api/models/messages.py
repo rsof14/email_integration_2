@@ -1,6 +1,6 @@
 from fastapi import Query
 from ...core.config import app_config
-from ...core.base_model import OrjsonBaseModel
+from pydantic import BaseModel
 
 
 class Page:
@@ -17,7 +17,7 @@ class Page:
         return self.page_size * (self.page_number - 1)
 
 
-class Message(OrjsonBaseModel):
+class Message(BaseModel):
     date: str
     from_email: str
     topic: str
