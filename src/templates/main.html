@@ -1,11 +1,154 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Emails</title>
-  <script src="{{ url_for('static', path='main.js') }}"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Письма</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .email-text {
+            white-space: pre-wrap;
+            overflow-y: auto;
+            max-height: 100px;
+            display: block;
+            position: relative;
+            width: 100%;
+        }
+        .table-container {
+            overflow-x: hidden;
+        }
+        table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        th, td {
+            word-wrap: break-word;
+        }
+        td {
+            vertical-align: top;
+        }
+
+    </style>
 </head>
 <body>
-  <p>This is emails page from email {{ email }}</p>
+    <div class="container-fluid">
+        <div class="d-flex justify-content-end mt-3">
+            <button id="refresh" class="btn btn-primary">Обновить</button>
+        </div>
+
+        <nav aria-label="Page navigation" class="my-3">
+            <ul class="pagination">
+                {% if pages_num <= 3 %}
+                    {% for i in range(1, pages_num + 1) %}
+                        {% if i == current_page %}
+                            <li class="page-item active">
+                        {% else %}
+                            <li class="page-item">
+                        {% endif %}
+                            <a class="page-link" href="/email/?page_number={{i}}">{{ i }}</a>
+                        </li>
+                    {% endfor %}
+                {% else %}
+                    {% if current_page > 2 %}
+                        {% if 1 == current_page %}
+                            <li class="page-item active">
+                        {% else %}
+                            <li class="page-item">
+                        {% endif %}
+                            <a class="page-link" href="/email/?page_number=1">1</a>
+                        </li>
+                        <li class="page-item">...</li>
+                    {% endif %}
+                    {% for i in range([current_page - 1, 1]|max, current_page + 2) %}
+                        {% if i == current_page %}
+                            <li class="page-item active">
+                        {% else %}
+                            <li class="page-item">
+                        {% endif %}
+                            <a class="page-link" href="/email/?page_number={{i}}">{{ i }}</a>
+                        </li>
+                    {% endfor %}
+                    {% if current_page + 2 < pages_num %}
+                        <li class="page-item">...</li>
+                    {% endif %}
+                    {% if current_page + 1 < pages_num %}
+                        {% if i == current_page %}
+                            <li class="page-item active">
+                        {% else %}
+                            <li class="page-item">
+                        {% endif %}
+                            <a class="page-link" href="/email/?page_number={{i}}">{{ i }}</a>
+                        </li>
+                    {% endif %}
+                {% endif %}
+            </ul>
+        </nav>
+
+        <div class="table-container">
+            <table class="table table-bordered" id="emails-table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Дата</th>
+                        <th style="width: 150px;">Отправитель</th>
+                        <th style="width: 200px;">Тема</th>
+                        <th style="width: 300px;">Текст письма</th>
+                        <th style="width: 100px;">Вложения</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for email in emails %}
+                    <tr>
+                        <td>{{ email.date }}</td>
+                        <td>{{ email.from_email }}</td>
+                        <td>{{ email.topic }}</td>
+                        <td>
+                            <div class="email-text">{{ email.message_text }}</div>
+                        </td>
+                        <td></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        var ws = new WebSocket("ws://" + document.domain + ':' + location.port + "/email/ws");
+        ws.onmessage = function(event) {
+            try {
+                const receivedList = JSON.parse(event.data);
+                console.log("Received list from server:", receivedList);
+                updateTable(receivedList);
+            } catch(e) {
+                alert(event.data);
+            }
+        };
+
+        document.getElementById('refresh').addEventListener('click', function(event) {
+            console.log('button');
+            event.preventDefault();
+            fetch('/email/update', {method: 'POST'})
+            .then(response => response.json())
+            .then(console.log(data.message));
+        })
+
+        function updateTable(emails) {
+            var inner = '';
+            emails.forEach(email => {
+                newRow = `<tr>
+                                <td>` + email.date + `</td>
+                                <td>` + email.from_email + `</td>
+                                <td>` + email.topic + `</td>
+                                <td>
+                                    <div class="email-text">` + email.message_text + `</div>
+                                </td>
+                                <td></td>
+                            </tr>`
+                inner = newRow + inner;
+            })
+            document.querySelector("#emails-table tbody").innerHTML = inner;
+        }
+    </script>
 </body>
 </html>

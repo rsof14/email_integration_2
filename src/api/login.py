@@ -7,7 +7,6 @@ from db.pg_db import get_db
 from typing import Annotated
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from starsessions import load_session
 
 
 router = APIRouter()

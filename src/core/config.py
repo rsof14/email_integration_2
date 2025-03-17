@@ -39,6 +39,8 @@ class AppConfig(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str
     SESSION_TTL_DAYS: int
+    MESSAGES_BATCH_SIZE: int
+    DEFAULT_PAGE_SIZE: int
 
 
 app_config = AppConfig()
