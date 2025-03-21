@@ -1,6 +1,6 @@
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
-from src.db.models import Message
+from ..models import Message
 
 
 def get_last_message(db: Session, email: str):
@@ -28,4 +28,4 @@ def get_user_emails_page(db: Session, email: str, page_from: int, page_size: int
 
 
 def get_all_emails(db: Session, email: str):
-    return db.query(Message).filter_by(email=email).all()
+    return db.query(Message).filter_by(email=email).count()

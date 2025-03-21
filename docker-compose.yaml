@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "6543:5432"
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: 123qwe
+      POSTGRES_DB: emails
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"

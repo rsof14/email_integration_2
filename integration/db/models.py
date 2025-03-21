@@ -1,9 +1,9 @@
+import uuid
+from datetime import datetime
 from sqlalchemy import Column, String, UUID, DateTime, Uuid
 from sqlalchemy.orm import reconstructor
 from sqlalchemy_utils import EmailType
-import uuid
 from .pg_db import Base
-from datetime import datetime
 
 
 class User(Base):
