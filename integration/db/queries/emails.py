@@ -28,4 +28,4 @@ def get_user_emails_page(db: Session, email: str, page_from: int, page_size: int
 
 
 def get_all_emails(db: Session, email: str):
-    return db.query(Message).filter_by(email=email).scalar()
+    return db.query(Message).filter_by(email=email).count()

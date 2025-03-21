@@ -1,5 +1,5 @@
-from email_observers import EmailObserver
-from email_fetcher import EmailFetcher
+from .email_observers import EmailObserver
+from .email_fetcher import EmailFetcher
 
 
 class EmailCollection:
