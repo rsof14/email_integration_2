@@ -1,15 +1,14 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from .models.login import LoginRequest
 from ..db.pg_db import get_db
 from ..services.login_service import login_user, UserIncorrectLoginData
+from ..templates import templates
 
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
 
 
 @router.get('/')
